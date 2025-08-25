@@ -1,0 +1,104 @@
+#include<lpc21xx.h>
+#define LED1 1<<10
+#define LED2 1<<11
+typedef unsigned char u8;
+//typedef unsigned char u8;
+void i2c_stop(void);
+void i2c_write(u8 );
+void restart(void);
+u8 nack(void);
+void i2c_start(void);
+void init(void);
+u8 eeprom_read_byte(u8 ,u8 );
+void eeprom_write_byte(u8 ,u8,u8 );
+void delay(int );
+
+int main()
+{
+ u8 a;
+ IODIR0=LED1|LED2;
+ init();
+ eeprom_write_byte(0x50,0x00,'a');
+ a=eeprom_read_byte(0x50,0x00);
+ if(a=='a')
+ {
+  IOSET0=LED1;
+ }
+ else
+ {
+  IOSET0=LED2; 
+ }
+ while(1);
+
+}
+void init(void)
+{
+  PINSEL0=1<<4|1<<6;// CONFIGURE THE SCL AND SDA PIN
+  I2SCLL=75; // SET THE SPEED 
+  I2SCLH=75; //  SLOVE THEN ONLY UNDERSTAND    
+  I2CONSET=1<<6; //ENABLE THE I2C PHERIPERAL   
+}
+
+void i2c_start(void)
+{
+  I2CONSET=1<<5;  // 5TH BIT MAKE IT AS HIGH -->SDA HIGH TO LOW TRANSITION START  
+  while(((I2CONSET>>3)&1)==0); //when transition over that tym si as set then outof loop
+  I2CONCLR=1<<5;  //  CLR THE START BIT BECAUSE CONTINUOUSLY HAPPENING   
+}
+void i2c_stop(void)
+{
+  I2CONSET=1<<4; // STOP CONDITION
+  I2CONCLR=1<<3;// CLR SI BIT
+
+}
+void i2c_write(u8 dat)
+{
+  I2DAT=dat;  // DATA STORE INTO BUFFER
+  I2CONCLR=1<<3;  // clr the si
+  while(((I2CONSET>>3)&1)==0);
+}
+void restart(void)
+{
+  I2CONSET=1<<5; // START 
+  I2CONCLR=1<<3; // SI CLEAR
+  while(((I2CONSET>3)&1)==0);
+  I2CONCLR=1<<5;  // CLEAR THE START BIT
+}
+u8 nack(void)
+{
+  I2CONSET=0X00;
+  I2CONCLR=1<<3;
+  while(((I2CONSET>>3)&1)==0);
+  return I2DAT;
+}
+void eeprom_write_byte(u8 slaveadd,u8 waddr,u8 data)
+{
+  i2c_start();
+  i2c_write(slaveadd<<1);
+  i2c_write(waddr);
+  i2c_write(data);
+  i2c_stop();
+  delay(10);
+}
+u8 eeprom_read_byte(u8 sadd,u8 wadd)
+{
+  u8 dat;
+  i2c_start();
+  i2c_write(sadd<<1);
+  i2c_write(wadd);
+  restart();
+  i2c_write(sadd<<1|1);
+  dat=nack();
+  i2c_stop();
+  return dat;
+}
+void delay(int sec)
+{
+ T0PR=15000-1;
+ T0TCR=0X01;
+ while(T0TC<sec);
+ T0TCR=0X03;
+ T0TCR=0X00;
+}
+
+
